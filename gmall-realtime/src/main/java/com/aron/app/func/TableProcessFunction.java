@@ -19,22 +19,22 @@ import java.util.*;
 
 public class TableProcessFunction extends BroadcastProcessFunction<JSONObject, String, JSONObject> {
 
-    //定义属性，侧输出流的标记
+    //定义属性,状态描述器
+    private MapStateDescriptor<String, TableProcess> mapStateDescriptor;
+
+    //定义属性,侧输出流标记
     private OutputTag<JSONObject> hbaseTag;
 
-    //定义属性，状态描述器
-    private MapStateDescriptor<String, TableProcess> mapStateDescriptor;
+    //声明Phoenix连接
+    private Connection connection;
 
     public TableProcessFunction() {
     }
 
-    public TableProcessFunction(MapStateDescriptor<String, TableProcess> mapStateDescriptor,OutputTag<JSONObject> HBaseTag ) {
-        this.hbaseTag = HBaseTag;
+    public TableProcessFunction(MapStateDescriptor<String, TableProcess> mapStateDescriptor, OutputTag<JSONObject> hbaseTag) {
         this.mapStateDescriptor = mapStateDescriptor;
+        this.hbaseTag = hbaseTag;
     }
-
-    //声明phoenix连接
-    private Connection connection;
 
     @Override
     public void open(Configuration parameters) throws Exception {
@@ -53,15 +53,16 @@ public class TableProcessFunction extends BroadcastProcessFunction<JSONObject, S
         TableProcess tableProcess = JSONObject.parseObject(data, TableProcess.class);
 
         //检验表是否存在，如果不存在则需要在Phoenix中建表
-        String sinkTable = tableProcess.getSinkTable();
+        String sinkType = tableProcess.getSinkType();
         String type = jsonObject.getString("type");
-        if ("insert".equals(type) && TableProcess.SINK_TYPE_HBASE.equals(sinkTable)) {
+        if ("insert".equals(type) && TableProcess.SINK_TYPE_HBASE.equals(sinkType)) {
             checkTable(tableProcess.getSinkTable(),
                     tableProcess.getSinkColumns(),
                     tableProcess.getSinkPk(),
                     tableProcess.getSinkExtend());
         }
         //写入状态
+
         BroadcastState<String, TableProcess> broadcastState = ctx.getBroadcastState(mapStateDescriptor);
         String key = tableProcess.getSourceTable() + "_" + tableProcess.getOperateType();
         broadcastState.put(key, tableProcess);
@@ -70,6 +71,7 @@ public class TableProcessFunction extends BroadcastProcessFunction<JSONObject, S
 
     //建表语句 create table if not exists db.table(id varchar primary key,tm_name varchar) ...
     private void checkTable(String sinkTable, String sinkColumns, String sinkPk, String sinkExtend) {
+        //处理字段
         if (sinkPk == null) {
             sinkPk = "id";
         }
@@ -78,7 +80,8 @@ public class TableProcessFunction extends BroadcastProcessFunction<JSONObject, S
         }
 
         try {
-            StringBuffer createTableSql = new StringBuffer("create table if not exists ")
+            //获取建表语句
+            StringBuilder createTableSql = new StringBuilder("create table if not exists ")
                     .append(GmallConfig.HBASE_SCHEMA)
                     .append(".")
                     .append(sinkTable)
@@ -86,33 +89,32 @@ public class TableProcessFunction extends BroadcastProcessFunction<JSONObject, S
             String[] columns = sinkColumns.split(",");
             for (int i = 0; i < columns.length; i++) {
                 String column = columns[i];
-
                 //判断是否为主键
                 if (sinkPk.equals(column)) {
                     createTableSql.append(column).append(" varchar primary key");
                 } else {
                     createTableSql.append(column).append(" varchar");
                 }
-                //判断是不是最后一个字段
+                //判断不是最后一个字段
                 if (i < columns.length - 1) {
                     createTableSql.append(",");
                 }
             }
-
-            createTableSql.append(")").append(sinkExtend);
+            createTableSql.append(")")
+                    .append(sinkExtend);
 
             System.out.println(createTableSql);
 
-            //预编译sql并赋值
+            //预编译SQL并赋值
             PreparedStatement preparedStatement = connection.prepareStatement(createTableSql.toString());
 
-            //执行sql语句并提交
+            //执行SQL语句并提交
             preparedStatement.execute();
             connection.commit();
 
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
-            throw new RuntimeException(sinkTable + "建表失败");
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw new RuntimeException("建表" + sinkTable + "失败！");
         }
 
     }

@@ -2,6 +2,7 @@ package com.aron.app.func;
 
 import com.alibaba.fastjson.JSONObject;
 import com.aron.common.GmallConfig;
+import com.aron.utils.DimUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
@@ -11,6 +12,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Collection;
+import java.util.Locale;
 import java.util.Set;
 
 public class DimSinkFunction extends RichSinkFunction<JSONObject> {
@@ -35,12 +37,19 @@ public class DimSinkFunction extends RichSinkFunction<JSONObject> {
             //预编译sql
             preparedStatement = connection.prepareStatement(upsertSql);
 
+            //如果当前维度数据为更新操作，则需要删除Redis中的数据
+            if ("update".equals(value.getString("type"))) {
+                String redisKey = "DIM:" + value.getString("sinkTable").toUpperCase() + ":" + value.getJSONObject("data").getString("id");
+                System.out.println("删除redisKey: "+redisKey);
+                DimUtil.delDimInfo(redisKey);
+            }
+
             //执行
             preparedStatement.execute();
             connection.commit();
         } catch (SQLException e) {
-            System.out.println("插入维度数据"+value.getString("data")+"失败!");
-        }finally {
+            System.out.println("插入维度数据" + value.getString("data") + "失败!");
+        } finally {
             if (null != preparedStatement) preparedStatement.close();
         }
     }
