@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * Phoenix查询的工具类
  */
-public class PhoenixUtil {
+public class JdbcUtil {
 
     //声明
     private static Connection connection;

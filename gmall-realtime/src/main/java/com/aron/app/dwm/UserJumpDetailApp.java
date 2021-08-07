@@ -98,7 +98,7 @@ public class UserJumpDetailApp {
         PatternStream<JSONObject> patternStream = CEP.pattern(keyedStream, pattern1);
 
         //TODO 6.提取事件(包含匹配上的以及超时事件)
-        //创建状态保存超时事件，代表该用户仅单跳访问一次，也算入结果
+        //创建侧输出流保存超时事件，代表该用户仅单跳访问一次，也算入结果
         OutputTag<JSONObject> outputTag = new OutputTag<JSONObject>("timeout") {};
 
         SingleOutputStreamOperator<JSONObject> selectDS = patternStream.select(outputTag,

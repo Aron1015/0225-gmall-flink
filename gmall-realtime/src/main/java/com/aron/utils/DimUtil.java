@@ -7,7 +7,6 @@ import redis.clients.jedis.Jedis;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.util.List;
 
 /**
@@ -44,7 +43,7 @@ public class DimUtil {
 //        System.out.println("sql:" + querySql);
 
         //查询
-        List<JSONObject> queryList = PhoenixUtil.queryList(connection, querySql, JSONObject.class, false);
+        List<JSONObject> queryList = JdbcUtil.queryList(connection, querySql, JSONObject.class, false);
         JSONObject dimIndoJson = queryList.get(0);
 
         //将查询到的数据写入缓存

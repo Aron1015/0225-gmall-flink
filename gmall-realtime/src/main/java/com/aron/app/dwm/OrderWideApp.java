@@ -109,7 +109,10 @@ public class OrderWideApp {
         //TODO 5.关联维度信息
 
         //5.1 关联用户维度
-        SingleOutputStreamOperator<OrderWide> orderWideWithUserDS = AsyncDataStream.unorderedWait(orderWideDS,
+        SingleOutputStreamOperator<OrderWide> orderWideWithUserDS = AsyncDataStream
+                //调用unorderedWait，返回顺序可能乱序，性能好
+                //调用orderedWait，保留顺序，可以按照发送的顺序返回
+                .unorderedWait(orderWideDS,
                 new DimAsyncFunction<OrderWide>("DIM_USER_INFO") {
                     @Override
                     public String getKey(OrderWide orderWide) {
